@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fact Knowledge Layer</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; line-height: 1.4; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: .3rem; }
+  .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .5rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; margin-top: .5rem; }
+  th, td { border: 1px solid #8884; padding: .4rem .5rem; text-align: left; vertical-align: top; }
+  th { background: #8882; }
+  tr.corroborates { background: rgba(60,180,90,.08); }
+  tr.contradicts { background: rgba(220,60,60,.08); }
+  tr.context_explained { background: rgba(220,180,40,.10); }
+  .quote { font-style: italic; color: #666; }
+  .tag { display: inline-block; padding: .1rem .5rem; border-radius: .8rem; font-size: .75rem; font-weight: 600; }
+  .tag.corroborates { background: #2e7d32; color: #fff; }
+  .tag.contradicts { background: #c62828; color: #fff; }
+  .tag.context_explained { background: #b8860b; color: #fff; }
+  .evidence { display: none; margin-top: .3rem; }
+  .evidence.open { display: block; }
+  .evidence-box { border-left: 3px solid #8884; padding: .3rem .6rem; margin: .3rem 0; }
+  button { cursor: pointer; }
+  #uploadStatus { font-size: .85rem; color: #666; }
+  select, input[type=file] { font-size: .9rem; }
+</style>
+</head>
+<body>
+<h1>Fact Knowledge Layer</h1>
+<p>Upload a PDF to extract grounded facts and see how they relate to facts already in the store.</p>
+
+<h2>Upload document</h2>
+<div class="row">
+  <input type="file" id="fileInput" accept="application/pdf">
+  <button id="uploadBtn">Upload &amp; Process</button>
+  <span id="uploadStatus"></span>
+</div>
+
+<h2>Documents</h2>
+<table id="docsTable">
+  <thead><tr><th>ID</th><th>Filename</th><th>Pages</th><th>Uploaded</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h2>Facts</h2>
+<div class="row">
+  <label>Filter by document: <select id="factDocFilter"><option value="">All</option></select></label>
+</div>
+<table id="factsTable">
+  <thead><tr><th>Doc</th><th>Page</th><th>Subject</th><th>Attribute</th><th>Value</th><th>Unit</th><th>Time scope</th><th>Category</th><th>Grounding</th><th>Quote</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h2>Cross-document relationships</h2>
+<div class="row">
+  <label>Filter: <select id="relTypeFilter">
+    <option value="">All</option>
+    <option value="corroborates">Corroborates</option>
+    <option value="contradicts">Contradicts</option>
+    <option value="context_explained">Context-explained</option>
+  </select></label>
+</div>
+<table id="relsTable">
+  <thead><tr><th>Type</th><th>Fact A</th><th>Fact B</th><th>Explanation</th><th>Confidence</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+
+async function loadDocuments() {
+  const docs = await fetch('/documents').then(r => r.json());
+  const tbody = $('#docsTable tbody');
+  tbody.innerHTML = '';
+  const filter = $('#factDocFilter');
+  filter.innerHTML = '<option value="">All</option>';
+  for (const d of docs) {
+    tbody.innerHTML += `<tr><td>${d.id}</td><td>${d.filename}</td><td>${d.page_count}</td><td>${new Date(d.uploaded_at).toLocaleString()}</td></tr>`;
+    filter.innerHTML += `<option value="${d.id}">${d.filename}</option>`;
+  }
+}
+
+async function loadFacts() {
+  const docId = $('#factDocFilter').value;
+  const url = docId ? `/facts?document_id=${docId}` : '/facts';
+  const facts = await fetch(url).then(r => r.json());
+  const docs = await fetch('/documents').then(r => r.json());
+  const docNameById = Object.fromEntries(docs.map(d => [d.id, d.filename]));
+  const tbody = $('#factsTable tbody');
+  tbody.innerHTML = '';
+  for (const f of facts) {
+    tbody.innerHTML += `<tr>
+      <td>${docNameById[f.document_id] || f.document_id}</td>
+      <td>${f.page_number}</td>
+      <td>${f.subject || ''}</td>
+      <td>${f.attribute || ''}</td>
+      <td>${f.value || ''}</td>
+      <td>${f.unit || ''}</td>
+      <td>${f.time_scope || ''}</td>
+      <td>${f.category || ''}</td>
+      <td>${f.grounding_status}</td>
+      <td class="quote">"${(f.verbatim_quote || '').slice(0, 140)}"</td>
+    </tr>`;
+  }
+}
+
+async function loadRelationships() {
+  const type = $('#relTypeFilter').value;
+  const url = type ? `/relationships?type=${type}` : '/relationships';
+  const rels = await fetch(url).then(r => r.json());
+  const tbody = $('#relsTable tbody');
+  tbody.innerHTML = '';
+  rels.forEach((r, idx) => {
+    const rowId = `ev-${idx}`;
+    tbody.innerHTML += `<tr class="${r.relation_type}">
+      <td><span class="tag ${r.relation_type}">${r.relation_type}</span></td>
+      <td><a href="#" onclick="toggleEvidence('${rowId}');return false;">${r.fact_a_text}</a></td>
+      <td><a href="#" onclick="toggleEvidence('${rowId}');return false;">${r.fact_b_text}</a></td>
+      <td>${r.explanation}</td>
+      <td>${(r.confidence ?? 0).toFixed(2)}</td>
+    </tr>
+    <tr><td colspan="5">
+      <div class="evidence" id="${rowId}">
+        <div class="evidence-box"><b>${r.fact_a_filename}</b>, page ${r.fact_a_page}: <span class="quote">"${r.fact_a_quote}"</span></div>
+        <div class="evidence-box"><b>${r.fact_b_filename}</b>, page ${r.fact_b_page}: <span class="quote">"${r.fact_b_quote}"</span></div>
+      </div>
+    </td></tr>`;
+  });
+}
+
+function toggleEvidence(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+$('#uploadBtn').addEventListener('click', async () => {
+  const file = $('#fileInput').files[0];
+  if (!file) { $('#uploadStatus').textContent = 'Choose a PDF first.'; return; }
+  $('#uploadStatus').textContent = 'Processing... this can take a minute for larger PDFs.';
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const res = await fetch('/documents', { method: 'POST', body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Upload failed');
+    $('#uploadStatus').textContent = `Done: ${data.facts_extracted} facts (${data.facts_verified} verified), ${data.relationships_created} new relationships.`;
+    await refreshAll();
+  } catch (e) {
+    $('#uploadStatus').textContent = 'Error: ' + e.message;
+  }
+});
+
+$('#factDocFilter').addEventListener('change', loadFacts);
+$('#relTypeFilter').addEventListener('change', loadRelationships);
+
+async function refreshAll() {
+  await loadDocuments();
+  await loadFacts();
+  await loadRelationships();
+}
+refreshAll();
+</script>
+</body>
+</html>
