@@ -60,6 +60,14 @@ async def get_relationships(type: str | None = None):
     return store.list_relationships(relation_type=type)
 
 
+@app.delete("/documents/{document_id}")
+async def delete_document(document_id: int):
+    deleted = store.delete_document(document_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"deleted": document_id}
+
+
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 

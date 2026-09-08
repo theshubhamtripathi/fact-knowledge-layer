@@ -308,6 +308,14 @@
   .copy-btn { background: none; border: none; padding: 0; font-family: var(--font-mono); font-size: .72rem; color: var(--ink-faint); cursor: pointer; font-weight: 500; }
   .copy-btn:hover { color: var(--accent); }
 
+  .delete-btn {
+    background: none; border: 1px solid var(--border); border-radius: 6px; padding: .3rem .6rem;
+    font-family: var(--font-mono); font-size: .72rem; color: var(--ink-faint); cursor: pointer;
+    display: inline-flex; align-items: center; gap: .35rem; transition: color .15s, border-color .15s, background .15s;
+  }
+  .delete-btn:hover { color: var(--red); border-color: var(--red); background: var(--red-bg); }
+  .delete-btn:disabled { opacity: .5; cursor: wait; }
+
   .empty { text-align: center; padding: 2.75rem 1rem; color: var(--ink-faint); font-size: .9rem; }
   .empty svg { margin-bottom: .5rem; opacity: .6; }
 
@@ -442,7 +450,7 @@
     <div class="panel" id="panel-documents">
       <div class="table-scroll">
         <table id="docsTable">
-          <thead><tr><th>ID</th><th>Filename</th><th>Pages</th><th>Uploaded</th></tr></thead>
+          <thead><tr><th>ID</th><th>Filename</th><th>Pages</th><th>Uploaded</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -540,15 +548,42 @@ function renderDocFilter() {
 function renderDocuments() {
   const tbody = $('#docsTable tbody');
   if (!allDocs.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--ink-faint);text-align:center;padding:1.5rem;">No documents uploaded yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--ink-faint);text-align:center;padding:1.5rem;">No documents uploaded yet.</td></tr>';
     return;
   }
-  tbody.innerHTML = allDocs.map(d => `<tr>
+  tbody.innerHTML = allDocs.map(d => `<tr data-doc-row="${d.id}">
       <td class="mono">${d.id}</td>
       <td>${esc(d.filename)}</td>
       <td class="mono">${d.page_count}</td>
       <td class="mono">${new Date(d.uploaded_at).toLocaleString()}</td>
+      <td><button class="delete-btn" onclick="deleteDocument(${d.id}, ${JSON.stringify(d.filename)})">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+        Remove</button></td>
     </tr>`).join('');
+}
+
+async function deleteDocument(id, filename) {
+  const factCount = allFacts.filter(f => f.document_id === id).length;
+  const relCount = allRels.filter(r => r.fact_a_filename === filename || r.fact_b_filename === filename).length;
+  const ok = confirm(
+    `Remove "${filename}"?\n\nThis permanently deletes its ${factCount} fact${factCount === 1 ? '' : 's'}` +
+    (relCount ? ` and ${relCount} relationship${relCount === 1 ? '' : 's'} built from them.` : '.')
+  );
+  if (!ok) return;
+
+  const row = document.querySelector(`tr[data-doc-row="${id}"]`);
+  const btn = row?.querySelector('.delete-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Removing…'; }
+
+  try {
+    const res = await fetch(`/documents/${id}`, { method: 'DELETE' });
+    if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.detail || 'Delete failed'); }
+    showToast(`Removed "${filename}" and its data`);
+    await loadAll();
+  } catch (e) {
+    showToast('Could not remove: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Remove'; }
+  }
 }
 
 function renderFacts() {

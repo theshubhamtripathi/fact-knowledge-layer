@@ -85,6 +85,24 @@ def list_documents() -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def delete_document(document_id: int) -> bool:
+    """Remove a document and everything derived from it: relationships
+    touching any of its facts, then the facts themselves, then the document
+    row. Returns False if the document didn't exist."""
+    with get_conn() as conn:
+        existing = conn.execute("SELECT id FROM documents WHERE id = ?", (document_id,)).fetchone()
+        if not existing:
+            return False
+        conn.execute(
+            """DELETE FROM relationships WHERE fact_id_a IN (SELECT id FROM facts WHERE document_id = ?)
+               OR fact_id_b IN (SELECT id FROM facts WHERE document_id = ?)""",
+            (document_id, document_id),
+        )
+        conn.execute("DELETE FROM facts WHERE document_id = ?", (document_id,))
+        conn.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+        return True
+
+
 def get_document(document_id: int) -> dict | None:
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM documents WHERE id = ?", (document_id,)).fetchone()
