@@ -14,7 +14,7 @@ import requests
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-GENERATION_MODEL = os.environ.get("GEMINI_GENERATION_MODEL", "models/gemini-flash-latest")
+GENERATION_MODEL = os.environ.get("GEMINI_GENERATION_MODEL", "models/gemini-flash-lite-latest")
 EMBEDDING_MODEL = os.environ.get("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001")
 
 _MAX_RETRIES = 10
@@ -51,9 +51,18 @@ def _post_with_retries(url: str, payload: dict) -> dict:
     last_err = None
     for attempt in range(_MAX_RETRIES):
         _throttle()
-        resp = requests.post(url, json=payload, timeout=180)
+        try:
+            resp = requests.post(url, json=payload, timeout=180)
+        except requests.exceptions.RequestException as e:
+            last_err = f"network error: {e}"
+            time.sleep(min(2 ** attempt, 30))
+            continue
         if resp.status_code == 200:
             return resp.json()
+        if resp.status_code == 429 and "PerDay" in resp.text:
+            # Daily quota exhausted for this model — retrying within the same
+            # run can never succeed, so fail fast instead of burning time.
+            raise LLMError(f"Daily quota exhausted: {resp.text[:800]}")
         if resp.status_code in (429, 500, 503):
             last_err = f"{resp.status_code}: {resp.text[:500]}"
             delay = _parse_retry_delay_seconds(resp.text, default=2 ** attempt)

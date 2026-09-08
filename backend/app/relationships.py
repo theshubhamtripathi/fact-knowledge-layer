@@ -8,10 +8,10 @@ import numpy as np
 
 from app.llm_client import generate_json
 
-PAIRS_PER_CLASSIFY_CALL = 8
+PAIRS_PER_CLASSIFY_CALL = 15
 
-SIMILARITY_THRESHOLD = 0.68
-TOP_K_PER_FACT = 5
+SIMILARITY_THRESHOLD = 0.72
+TOP_K_PER_FACT = 3
 
 RELATION_SCHEMA = {
     "type": "OBJECT",

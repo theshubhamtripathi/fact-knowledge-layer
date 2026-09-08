@@ -4,6 +4,8 @@ __pycache__/
 *.pyc
 *.db
 *.db-journal
+*.log
+*_dump.txt
 node_modules/
 .venv/
 venv/

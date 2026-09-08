@@ -16,7 +16,7 @@ from app.relationships import PAIRS_PER_CLASSIFY_CALL, classify_pairs_batch, fin
 
 logger = logging.getLogger(__name__)
 
-WINDOW_SIZE = 15
+WINDOW_SIZE = 25
 WINDOW_OVERLAP = 1
 
 
