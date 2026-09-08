@@ -2,165 +2,464 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fact Knowledge Layer</title>
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; line-height: 1.4; }
-  h1 { font-size: 1.4rem; }
-  h2 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: .3rem; }
-  .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .5rem 0; }
-  table { border-collapse: collapse; width: 100%; font-size: .85rem; margin-top: .5rem; }
-  th, td { border: 1px solid #8884; padding: .4rem .5rem; text-align: left; vertical-align: top; }
-  th { background: #8882; }
-  tr.corroborates { background: rgba(60,180,90,.08); }
-  tr.contradicts { background: rgba(220,60,60,.08); }
-  tr.context_explained { background: rgba(220,180,40,.10); }
-  .quote { font-style: italic; color: #666; }
-  .tag { display: inline-block; padding: .1rem .5rem; border-radius: .8rem; font-size: .75rem; font-weight: 600; }
-  .tag.corroborates { background: #2e7d32; color: #fff; }
-  .tag.contradicts { background: #c62828; color: #fff; }
-  .tag.context_explained { background: #b8860b; color: #fff; }
-  .evidence { display: none; margin-top: .3rem; }
-  .evidence.open { display: block; }
-  .evidence-box { border-left: 3px solid #8884; padding: .3rem .6rem; margin: .3rem 0; }
-  button { cursor: pointer; }
-  #uploadStatus { font-size: .85rem; color: #666; }
-  select, input[type=file] { font-size: .9rem; }
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --surface-2: #fbfbfe;
+    --border: #e3e5ec;
+    --text: #16181d;
+    --text-dim: #6b7280;
+    --text-faint: #9aa0ac;
+    --accent: #4f5bd5;
+    --accent-soft: #eef0fd;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+    --shadow-md: 0 4px 12px rgba(16,24,40,.08);
+    --radius: 12px;
+    --green: #16794f;
+    --green-bg: #e6f6ee;
+    --red: #b3261e;
+    --red-bg: #fdecea;
+    --amber: #8a5a00;
+    --amber-bg: #fff4dd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1015;
+      --surface: #171a21;
+      --surface-2: #1d212a;
+      --border: #2a2e39;
+      --text: #eef0f4;
+      --text-dim: #a2a8b5;
+      --text-faint: #6b7280;
+      --accent: #8b93f5;
+      --accent-soft: #23264a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3);
+      --shadow-md: 0 8px 24px rgba(0,0,0,.4);
+      --green: #4ade95;
+      --green-bg: #103a27;
+      --red: #ff8a80;
+      --red-bg: #3d1815;
+      --amber: #ffcf5c;
+      --amber-bg: #3a2d0c;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 1.75rem 1.5rem 4rem; }
+
+  header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  header.top h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 .25rem; letter-spacing: -0.01em; }
+  header.top p { margin: 0; color: var(--text-dim); font-size: .92rem; max-width: 56ch; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: .9rem 1.1rem; box-shadow: var(--shadow);
+  }
+  .stat .num { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+  .stat .label { font-size: .78rem; color: var(--text-dim); margin-top: .2rem; text-transform: uppercase; letter-spacing: .04em; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 1.25rem; margin-bottom: 1.25rem;
+  }
+  .card h2 { font-size: 1.02rem; font-weight: 600; margin: 0 0 .9rem; display: flex; align-items: center; gap: .5rem; }
+  .card h2 .count { font-weight: 500; color: var(--text-dim); font-size: .85rem; }
+
+  #dropzone {
+    border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 1.6rem;
+    text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+    background: var(--surface-2);
+  }
+  #dropzone.drag { border-color: var(--accent); background: var(--accent-soft); }
+  #dropzone .icon { font-size: 1.6rem; margin-bottom: .3rem; }
+  #dropzone .hint { color: var(--text-faint); font-size: .82rem; margin-top: .25rem; }
+  #fileInput { display: none; }
+  .file-chip {
+    display: inline-flex; align-items: center; gap: .5rem; background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: .3rem .8rem; font-size: .85rem; font-weight: 600; margin-top: .7rem;
+  }
+
+  button {
+    cursor: pointer; font: inherit; border: none; border-radius: 8px; padding: .55rem 1.1rem;
+    font-weight: 600; font-size: .88rem; transition: opacity .15s, transform .05s;
+  }
+  button:active { transform: scale(.98); }
+  button.primary { background: var(--accent); color: #fff; }
+  button.primary:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+  .upload-row { display: flex; align-items: center; gap: .8rem; margin-top: .9rem; flex-wrap: wrap; }
+  #uploadStatus { font-size: .85rem; color: var(--text-dim); }
+  #uploadStatus.err { color: var(--red); }
+  #uploadStatus.ok { color: var(--green); }
+  .spinner {
+    width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tabs { display: flex; gap: .3rem; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem; }
+  .tab {
+    padding: .6rem 1rem; font-size: .9rem; font-weight: 600; color: var(--text-dim); cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; user-select: none;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .badge { background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: .05rem .5rem; font-size: .72rem; margin-left: .35rem; color: var(--text-faint); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .toolbar { display: flex; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+  input[type=search], select {
+    font: inherit; font-size: .88rem; padding: .5rem .7rem; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); min-width: 180px;
+  }
+  input[type=search]:focus, select:focus { outline: none; border-color: var(--accent); }
+  .pillbar { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .pill {
+    padding: .4rem .85rem; border-radius: 999px; font-size: .82rem; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); user-select: none;
+  }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .84rem; }
+  thead th {
+    text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-faint); font-weight: 600; padding: .5rem .6rem; border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: .55rem .6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:hover { background: var(--surface-2); }
+  tbody tr:last-child td { border-bottom: none; }
+  .quote { color: var(--text-dim); font-style: italic; }
+  .mono { font-variant-numeric: tabular-nums; }
+  .table-scroll { overflow-x: auto; border-radius: 8px; }
+
+  .badge { display: inline-flex; align-items: center; gap: .3rem; padding: .18rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+  .badge.verified { background: var(--green-bg); color: var(--green); }
+  .badge.failed { background: var(--red-bg); color: var(--red); }
+  .badge.corroborates { background: var(--green-bg); color: var(--green); }
+  .badge.contradicts { background: var(--red-bg); color: var(--red); }
+  .badge.context_explained { background: var(--amber-bg); color: var(--amber); }
+
+  .rel-card {
+    border: 1px solid var(--border); border-radius: 10px; margin-bottom: .7rem; overflow: hidden; background: var(--surface);
+  }
+  .rel-card.corroborates { border-left: 4px solid var(--green); }
+  .rel-card.contradicts { border-left: 4px solid var(--red); }
+  .rel-card.context_explained { border-left: 4px solid var(--amber); }
+  .rel-head { display: flex; align-items: center; gap: .7rem; padding: .8rem 1rem; cursor: pointer; flex-wrap: wrap; }
+  .rel-head .facts-summary { flex: 1; min-width: 240px; font-size: .87rem; }
+  .rel-head .facts-summary .a { font-weight: 600; }
+  .rel-head .facts-summary .vs { color: var(--text-faint); font-weight: 500; margin: 0 .35rem; }
+  .conf { font-size: .78rem; color: var(--text-faint); font-weight: 600; }
+  .chev { color: var(--text-faint); transition: transform .15s; font-size: .8rem; }
+  .rel-card.open .chev { transform: rotate(90deg); }
+  .rel-body { display: none; padding: 0 1rem 1rem; }
+  .rel-card.open .rel-body { display: block; }
+  .reasoning { font-size: .85rem; color: var(--text-dim); margin-bottom: .7rem; padding: .6rem .8rem; background: var(--surface-2); border-radius: 8px; }
+  .evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+  @media (max-width: 640px) { .evidence-grid { grid-template-columns: 1fr; } }
+  .evidence-box { border: 1px solid var(--border); border-radius: 8px; padding: .65rem .8rem; background: var(--surface-2); }
+  .evidence-box .src { font-size: .74rem; color: var(--text-faint); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-bottom: .3rem; }
+  .evidence-box .q { font-size: .85rem; font-style: italic; color: var(--text); }
+
+  .empty { text-align: center; padding: 2.5rem 1rem; color: var(--text-faint); font-size: .9rem; }
+  .empty .icon { font-size: 1.8rem; margin-bottom: .4rem; }
 </style>
 </head>
 <body>
-<h1>Fact Knowledge Layer</h1>
-<p>Upload a PDF to extract grounded facts and see how they relate to facts already in the store.</p>
+<div class="wrap">
 
-<h2>Upload document</h2>
-<div class="row">
-  <input type="file" id="fileInput" accept="application/pdf">
-  <button id="uploadBtn">Upload &amp; Process</button>
-  <span id="uploadStatus"></span>
+  <header class="top">
+    <div>
+      <h1>Fact Knowledge Layer</h1>
+      <p>Upload a PDF to extract grounded facts and see how they corroborate, contradict, or contextually
+      explain facts already in the store — every claim traces back to a verbatim quote and page number.</p>
+    </div>
+  </header>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="num" id="statDocs">–</div><div class="label">Documents</div></div>
+    <div class="stat"><div class="num" id="statFacts">–</div><div class="label">Facts</div></div>
+    <div class="stat"><div class="num" id="statVerified">–</div><div class="label">Grounded</div></div>
+    <div class="stat"><div class="num" id="statRels">–</div><div class="label">Relationships</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Upload a document</h2>
+    <div id="dropzone">
+      <div class="icon">📄</div>
+      <div><strong>Drop a PDF here</strong> or click to browse</div>
+      <div class="hint">Facts will be extracted, grounded against the source text, and compared to everything already ingested.</div>
+      <div id="fileChipWrap"></div>
+    </div>
+    <input type="file" id="fileInput" accept="application/pdf">
+    <div class="upload-row">
+      <button class="primary" id="uploadBtn" disabled>Upload &amp; Process</button>
+      <span id="uploadStatus"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" data-tab="facts">Facts <span class="badge-count badge" style="display:none"></span></div>
+      <div class="tab" data-tab="relationships">Relationships</div>
+      <div class="tab" data-tab="documents">Documents</div>
+    </div>
+
+    <div class="panel active" id="panel-facts">
+      <div class="toolbar">
+        <select id="factDocFilter"><option value="">All documents</option></select>
+        <select id="factGroundFilter">
+          <option value="">All grounding</option>
+          <option value="verified">Verified only</option>
+          <option value="failed">Failed only</option>
+        </select>
+        <input type="search" id="factSearch" placeholder="Search subject, attribute, value, quote…">
+      </div>
+      <div class="table-scroll">
+        <table id="factsTable">
+          <thead><tr><th>Doc</th><th>Pg</th><th>Subject</th><th>Attribute</th><th>Value</th><th>Unit</th><th>Time scope</th><th>Category</th><th>Grounding</th><th>Quote</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="empty" id="factsEmpty" style="display:none"><div class="icon">🔍</div>No facts match this filter.</div>
+    </div>
+
+    <div class="panel" id="panel-relationships">
+      <div class="toolbar">
+        <div class="pillbar" id="relPills">
+          <div class="pill active" data-type="">All</div>
+          <div class="pill" data-type="corroborates">Corroborates</div>
+          <div class="pill" data-type="contradicts">Contradicts</div>
+          <div class="pill" data-type="context_explained">Context-explained</div>
+        </div>
+      </div>
+      <div id="relsList"></div>
+      <div class="empty" id="relsEmpty" style="display:none"><div class="icon">🔗</div>No relationships of this type yet.</div>
+    </div>
+
+    <div class="panel" id="panel-documents">
+      <div class="table-scroll">
+        <table id="docsTable">
+          <thead><tr><th>ID</th><th>Filename</th><th>Pages</th><th>Uploaded</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>
-
-<h2>Documents</h2>
-<table id="docsTable">
-  <thead><tr><th>ID</th><th>Filename</th><th>Pages</th><th>Uploaded</th></tr></thead>
-  <tbody></tbody>
-</table>
-
-<h2>Facts</h2>
-<div class="row">
-  <label>Filter by document: <select id="factDocFilter"><option value="">All</option></select></label>
-</div>
-<table id="factsTable">
-  <thead><tr><th>Doc</th><th>Page</th><th>Subject</th><th>Attribute</th><th>Value</th><th>Unit</th><th>Time scope</th><th>Category</th><th>Grounding</th><th>Quote</th></tr></thead>
-  <tbody></tbody>
-</table>
-
-<h2>Cross-document relationships</h2>
-<div class="row">
-  <label>Filter: <select id="relTypeFilter">
-    <option value="">All</option>
-    <option value="corroborates">Corroborates</option>
-    <option value="contradicts">Contradicts</option>
-    <option value="context_explained">Context-explained</option>
-  </select></label>
-</div>
-<table id="relsTable">
-  <thead><tr><th>Type</th><th>Fact A</th><th>Fact B</th><th>Explanation</th><th>Confidence</th></tr></thead>
-  <tbody></tbody>
-</table>
 
 <script>
-const $ = (sel) => document.querySelector(sel);
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = (s) => (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-async function loadDocuments() {
-  const docs = await fetch('/documents').then(r => r.json());
+let allDocs = [], allFacts = [], allRels = [];
+let selectedFile = null;
+
+async function loadAll() {
+  [allDocs, allFacts, allRels] = await Promise.all([
+    fetch('/documents').then(r => r.json()),
+    fetch('/facts').then(r => r.json()),
+    fetch('/relationships').then(r => r.json()),
+  ]);
+  renderStats();
+  renderDocFilter();
+  renderDocuments();
+  renderFacts();
+  renderRelationships();
+}
+
+function renderStats() {
+  $('#statDocs').textContent = allDocs.length;
+  $('#statFacts').textContent = allFacts.length;
+  const verified = allFacts.filter(f => f.grounding_status === 'verified').length;
+  $('#statVerified').textContent = allFacts.length ? `${verified} (${Math.round(100 * verified / allFacts.length)}%)` : '0';
+  $('#statRels').textContent = allRels.length;
+}
+
+function renderDocFilter() {
+  const sel = $('#factDocFilter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All documents</option>' +
+    allDocs.map(d => `<option value="${d.id}">${esc(d.filename)}</option>`).join('');
+  sel.value = current;
+}
+
+function renderDocuments() {
   const tbody = $('#docsTable tbody');
-  tbody.innerHTML = '';
-  const filter = $('#factDocFilter');
-  filter.innerHTML = '<option value="">All</option>';
-  for (const d of docs) {
-    tbody.innerHTML += `<tr><td>${d.id}</td><td>${d.filename}</td><td>${d.page_count}</td><td>${new Date(d.uploaded_at).toLocaleString()}</td></tr>`;
-    filter.innerHTML += `<option value="${d.id}">${d.filename}</option>`;
+  if (!allDocs.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-faint);text-align:center;padding:1.5rem;">No documents uploaded yet.</td></tr>';
+    return;
   }
+  tbody.innerHTML = allDocs.map(d => `<tr>
+      <td class="mono">${d.id}</td>
+      <td>${esc(d.filename)}</td>
+      <td class="mono">${d.page_count}</td>
+      <td>${new Date(d.uploaded_at).toLocaleString()}</td>
+    </tr>`).join('');
 }
 
-async function loadFacts() {
+function renderFacts() {
   const docId = $('#factDocFilter').value;
-  const url = docId ? `/facts?document_id=${docId}` : '/facts';
-  const facts = await fetch(url).then(r => r.json());
-  const docs = await fetch('/documents').then(r => r.json());
-  const docNameById = Object.fromEntries(docs.map(d => [d.id, d.filename]));
-  const tbody = $('#factsTable tbody');
-  tbody.innerHTML = '';
-  for (const f of facts) {
-    tbody.innerHTML += `<tr>
-      <td>${docNameById[f.document_id] || f.document_id}</td>
-      <td>${f.page_number}</td>
-      <td>${f.subject || ''}</td>
-      <td>${f.attribute || ''}</td>
-      <td>${f.value || ''}</td>
-      <td>${f.unit || ''}</td>
-      <td>${f.time_scope || ''}</td>
-      <td>${f.category || ''}</td>
-      <td>${f.grounding_status}</td>
-      <td class="quote">"${(f.verbatim_quote || '').slice(0, 140)}"</td>
-    </tr>`;
+  const ground = $('#factGroundFilter').value;
+  const q = $('#factSearch').value.trim().toLowerCase();
+  const docNameById = Object.fromEntries(allDocs.map(d => [d.id, d.filename]));
+
+  let rows = allFacts;
+  if (docId) rows = rows.filter(f => String(f.document_id) === docId);
+  if (ground) rows = rows.filter(f => f.grounding_status === ground);
+  if (q) {
+    rows = rows.filter(f => [f.subject, f.attribute, f.value, f.verbatim_quote, f.fact_text]
+      .some(v => (v || '').toLowerCase().includes(q)));
   }
+
+  const tbody = $('#factsTable tbody');
+  $('#factsEmpty').style.display = rows.length ? 'none' : 'block';
+  tbody.innerHTML = rows.map(f => `<tr>
+      <td>${esc(docNameById[f.document_id] || f.document_id)}</td>
+      <td class="mono">${f.page_number}</td>
+      <td>${esc(f.subject)}</td>
+      <td>${esc(f.attribute)}</td>
+      <td>${esc(f.value)}</td>
+      <td>${esc(f.unit)}</td>
+      <td>${esc(f.time_scope)}</td>
+      <td>${esc(f.category)}</td>
+      <td><span class="badge ${f.grounding_status}">${f.grounding_status}</span></td>
+      <td class="quote">"${esc((f.verbatim_quote || '').slice(0, 130))}${(f.verbatim_quote || '').length > 130 ? '…' : ''}"</td>
+    </tr>`).join('');
 }
 
-async function loadRelationships() {
-  const type = $('#relTypeFilter').value;
-  const url = type ? `/relationships?type=${type}` : '/relationships';
-  const rels = await fetch(url).then(r => r.json());
-  const tbody = $('#relsTable tbody');
-  tbody.innerHTML = '';
-  rels.forEach((r, idx) => {
-    const rowId = `ev-${idx}`;
-    tbody.innerHTML += `<tr class="${r.relation_type}">
-      <td><span class="tag ${r.relation_type}">${r.relation_type}</span></td>
-      <td><a href="#" onclick="toggleEvidence('${rowId}');return false;">${r.fact_a_text}</a></td>
-      <td><a href="#" onclick="toggleEvidence('${rowId}');return false;">${r.fact_b_text}</a></td>
-      <td>${r.explanation}</td>
-      <td>${(r.confidence ?? 0).toFixed(2)}</td>
-    </tr>
-    <tr><td colspan="5">
-      <div class="evidence" id="${rowId}">
-        <div class="evidence-box"><b>${r.fact_a_filename}</b>, page ${r.fact_a_page}: <span class="quote">"${r.fact_a_quote}"</span></div>
-        <div class="evidence-box"><b>${r.fact_b_filename}</b>, page ${r.fact_b_page}: <span class="quote">"${r.fact_b_quote}"</span></div>
+let activeRelType = '';
+function renderRelationships() {
+  let rows = allRels;
+  if (activeRelType) rows = rows.filter(r => r.relation_type === activeRelType);
+
+  const list = $('#relsList');
+  $('#relsEmpty').style.display = rows.length ? 'none' : 'block';
+
+  list.innerHTML = rows.map((r, i) => `
+    <div class="rel-card ${r.relation_type}" data-idx="${i}">
+      <div class="rel-head" onclick="this.parentElement.classList.toggle('open')">
+        <span class="badge ${r.relation_type}">${r.relation_type.replace('_', ' ')}</span>
+        <div class="facts-summary">
+          <span class="a">${esc(r.fact_a_text)}</span>
+          <span class="vs">↔</span>
+          <span class="a">${esc(r.fact_b_text)}</span>
+        </div>
+        <span class="conf">${Math.round((r.confidence ?? 0) * 100)}% confidence</span>
+        <span class="chev">▶</span>
       </div>
-    </td></tr>`;
+      <div class="rel-body">
+        <div class="reasoning">💡 ${esc(r.explanation)}</div>
+        <div class="evidence-grid">
+          <div class="evidence-box">
+            <div class="src">${esc(r.fact_a_filename)} · page ${r.fact_a_page}</div>
+            <div class="q">"${esc(r.fact_a_quote)}"</div>
+          </div>
+          <div class="evidence-box">
+            <div class="src">${esc(r.fact_b_filename)} · page ${r.fact_b_page}</div>
+            <div class="q">"${esc(r.fact_b_quote)}"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    $('#panel-' + tab.dataset.tab).classList.add('active');
   });
+});
+
+// Relationship filter pills
+$('#relPills').addEventListener('click', (e) => {
+  const pill = e.target.closest('.pill');
+  if (!pill) return;
+  document.querySelectorAll('#relPills .pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  activeRelType = pill.dataset.type;
+  renderRelationships();
+});
+
+// Facts filters
+$('#factDocFilter').addEventListener('change', renderFacts);
+$('#factGroundFilter').addEventListener('change', renderFacts);
+$('#factSearch').addEventListener('input', renderFacts);
+
+// Upload
+const dropzone = $('#dropzone');
+const fileInput = $('#fileInput');
+const uploadBtn = $('#uploadBtn');
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) setFile(fileInput.files[0]); });
+
+function setFile(file) {
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    $('#uploadStatus').textContent = 'Please choose a PDF file.';
+    $('#uploadStatus').className = 'err';
+    return;
+  }
+  selectedFile = file;
+  $('#fileChipWrap').innerHTML = `<div class="file-chip">📎 ${esc(file.name)} · ${(file.size / 1024 / 1024).toFixed(1)} MB</div>`;
+  uploadBtn.disabled = false;
+  $('#uploadStatus').textContent = '';
+  $('#uploadStatus').className = '';
 }
 
-function toggleEvidence(id) {
-  document.getElementById(id).classList.toggle('open');
-}
+uploadBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  uploadBtn.disabled = true;
+  $('#uploadStatus').className = '';
+  $('#uploadStatus').innerHTML = `<span class="spinner"></span> Processing — large PDFs can take a few minutes…`;
 
-$('#uploadBtn').addEventListener('click', async () => {
-  const file = $('#fileInput').files[0];
-  if (!file) { $('#uploadStatus').textContent = 'Choose a PDF first.'; return; }
-  $('#uploadStatus').textContent = 'Processing... this can take a minute for larger PDFs.';
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', selectedFile);
   try {
     const res = await fetch('/documents', { method: 'POST', body: form });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Upload failed');
-    $('#uploadStatus').textContent = `Done: ${data.facts_extracted} facts (${data.facts_verified} verified), ${data.relationships_created} new relationships.`;
-    await refreshAll();
+    $('#uploadStatus').className = 'ok';
+    $('#uploadStatus').textContent =
+      `Done: ${data.facts_extracted} facts extracted (${data.facts_verified} verified), ${data.relationships_created} new relationships.`;
+    selectedFile = null;
+    fileInput.value = '';
+    $('#fileChipWrap').innerHTML = '';
+    await loadAll();
   } catch (e) {
+    $('#uploadStatus').className = 'err';
     $('#uploadStatus').textContent = 'Error: ' + e.message;
+  } finally {
+    uploadBtn.disabled = !selectedFile;
   }
 });
 
-$('#factDocFilter').addEventListener('change', loadFacts);
-$('#relTypeFilter').addEventListener('change', loadRelationships);
-
-async function refreshAll() {
-  await loadDocuments();
-  await loadFacts();
-  await loadRelationships();
-}
-refreshAll();
+loadAll();
 </script>
 </body>
 </html>
