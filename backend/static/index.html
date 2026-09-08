@@ -556,7 +556,7 @@ function renderDocuments() {
       <td>${esc(d.filename)}</td>
       <td class="mono">${d.page_count}</td>
       <td class="mono">${new Date(d.uploaded_at).toLocaleString()}</td>
-      <td><button class="delete-btn" onclick="deleteDocument(${d.id}, ${JSON.stringify(d.filename)})">
+      <td><button class="delete-btn" onclick='deleteDocument(${d.id}, ${JSON.stringify(d.filename)})'>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
         Remove</button></td>
     </tr>`).join('');
